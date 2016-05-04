@@ -26,7 +26,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import javax.json.Json;
-import javax.json.JsonArray;
 import javax.json.JsonObject;
 import javax.json.JsonReader;
 import javax.json.JsonValue;
@@ -99,7 +98,7 @@ public class ExecutionClient implements Runnable {
 	public void run() {
 		messages = new TreeMap<>();
 		executor = Executors.newFixedThreadPool(threads);
-		AsyncHttpClientConfig cf = new DefaultAsyncHttpClientConfig.Builder().setKeepAlive(true).build();
+		AsyncHttpClientConfig cf = new DefaultAsyncHttpClientConfig.Builder().build();
 		httpClient = new DefaultAsyncHttpClient(cf);
 		if (limite) {
 			testLimites();
@@ -122,9 +121,9 @@ public class ExecutionClient implements Runnable {
 	protected void verifierSynthese(long startParam) {
 		// on agrandit la plage pour les messages avec un timestamp aléatoire
 		long start = startParam - 10000;
-		long diff = System.currentTimeMillis() - start + 10000;
+		long diff = System.currentTimeMillis() - start + 20000;
 		for (int i = 0; i < syntheses; i++) {
-			long duration = r.get().nextInt((int) diff - 1000);
+			long duration = 1000 + r.get().nextInt((int) diff - 2500);
 			long relativeStart = r.get().nextInt((int) (diff - duration));
 			long syntheseStart = start + relativeStart;
 			int durationSecondes = (int) (duration / 1000);
@@ -161,12 +160,12 @@ public class ExecutionClient implements Runnable {
 		assertEquals("Mauvaise moyenne", 0L, getValeurSynthese(remoteSynthese, SENSOR_LIMITE, "mediumValue"));
 
 		LOGGER.info("Envoi du message regreergregregre");
-		sendMessage("regreergregregre", null, null, null);
+		sendMessage("regreergregregre", null, SENSOR_LIMITE, null);
 
 		LOGGER.info("Envoi de 2 messages identiques");
 		String sameId = getMessageId();
-		sendMessage(sameId, null, null, null);
-		if (!sendMessage(sameId, null, null, null)) {
+		sendMessage(sameId, null, SENSOR_LIMITE, null);
+		if (!sendMessage(sameId, null, SENSOR_LIMITE, null)) {
 			LOGGER.info("Id dupliqué détecté");
 		} else {
 			LOGGER.error("Id dupliqué non détecté");
@@ -179,7 +178,7 @@ public class ExecutionClient implements Runnable {
 		List<Future<Boolean>> futures = new ArrayList<>();
 		for (int i = 0; i < 10; i++) {
 			for (String id : ids) {
-				futures.add(executor.submit(() -> sendMessage(id, null, null, null)));
+				futures.add(executor.submit(() -> sendMessage(id, null, SENSOR_LIMITE, null)));
 			}
 		}
 		try {

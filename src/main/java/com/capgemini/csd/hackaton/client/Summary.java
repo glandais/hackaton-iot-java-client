@@ -2,7 +2,6 @@ package com.capgemini.csd.hackaton.client;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.function.LongConsumer;
 
 public class Summary {
 
@@ -15,18 +14,6 @@ public class Summary {
 	public Summary(int sensorType) {
 		super();
 		this.sensorType = sensorType;
-	}
-
-	public Summary(int sensorType, Number count, Number total, Number min, Number max) {
-		this(sensorType);
-		this.min = min.longValue();
-		this.max = max.longValue();
-		this.count = count.longValue();
-		if (total instanceof BigDecimal) {
-			this.total = (BigDecimal) total;
-		} else {
-			this.total = BigDecimal.valueOf(total.doubleValue());
-		}
 	}
 
 	public int getSensorType() {
