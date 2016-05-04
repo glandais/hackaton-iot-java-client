@@ -155,6 +155,8 @@ public class ExecutionClient implements Runnable {
 		sendMessage(null, null, SENSOR_LIMITE, -1000L);
 		sendMessage(null, null, SENSOR_LIMITE, 1L);
 		sendMessage(null, null, SENSOR_LIMITE, 1000L);
+		sendMessage(null, null, SENSOR_LIMITE, 1000L);
+		sendMessage(null, null, SENSOR_LIMITE, -1000L);
 		sendMessage(null, null, SENSOR_LIMITE, Long.MAX_VALUE);
 		remoteSynthese = getSynthese(start, 10);
 		assertEquals("Mauvaise moyenne", 0L, getValeurSynthese(remoteSynthese, SENSOR_LIMITE, "mediumValue"));
@@ -226,7 +228,7 @@ public class ExecutionClient implements Runnable {
 		Future<?>[] futures = new Future<?>[m];
 		long start = System.nanoTime();
 		for (int i = 0; i < m; i++) {
-			futures[i] = executor.submit(() -> sendMessage(true));
+			futures[i] = executor.submit(() -> sendMessageRandomTime());
 		}
 		for (Future<?> future : futures) {
 			try {
@@ -251,11 +253,8 @@ public class ExecutionClient implements Runnable {
 		}
 	}
 
-	protected void sendMessage(boolean randomTime) {
-		Long timestamp = null;
-		if (randomTime) {
-			timestamp = System.currentTimeMillis() - 10000 + r.get().nextInt(20000);
-		}
+	protected void sendMessageRandomTime() {
+		Long timestamp = System.currentTimeMillis() - 10000 + r.get().nextInt(20000);
 		sendMessage(null, timestamp, null, null);
 	}
 
@@ -347,7 +346,6 @@ public class ExecutionClient implements Runnable {
 		}
 		JsonReader reader = Json.createReader(new ByteArrayInputStream(response.getBytes()));
 		List<JsonValue> syntheses = reader.readArray();
-		//		List<Map<?, ?>> syntheses = JsonFactory.fromJson(response, List.class);
 		return syntheses.stream()
 				.collect(Collectors.toMap(e -> ((JsonObject) e).getInt("sensorType"), e -> (JsonObject) e, (k, v) -> {
 					throw new RuntimeException(String.format("Duplicate key %s", k));
