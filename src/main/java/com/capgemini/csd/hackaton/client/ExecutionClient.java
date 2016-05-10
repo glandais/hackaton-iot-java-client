@@ -290,8 +290,8 @@ public class ExecutionClient implements Runnable {
 	protected boolean sendMessage(String json) {
 		try {
 			LOGGER.debug("Sending " + json);
-			Response response = httpClient.preparePost("http://" + host + ":" + port + "/messages").setBody(json)
-					.execute().get();
+			Response response = httpClient.preparePost("http://" + host + ":" + port + "/messages")
+					.addHeader("Content-Type", "application/json").setBody(json).execute().get();
 			LOGGER.debug("Response " + response.getStatusCode());
 			if (response.getStatusCode() != 200) {
 				throw new IllegalStateException("Erreur! " + response);
