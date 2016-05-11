@@ -6,7 +6,6 @@ import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,12 +15,12 @@ import java.util.NavigableMap;
 import java.util.Random;
 import java.util.TreeMap;
 import java.util.UUID;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -30,12 +29,6 @@ import javax.json.JsonObject;
 import javax.json.JsonReader;
 import javax.json.JsonValue;
 
-import org.asynchttpclient.AsyncHttpClient;
-import org.asynchttpclient.AsyncHttpClientConfig;
-import org.asynchttpclient.DefaultAsyncHttpClient;
-import org.asynchttpclient.DefaultAsyncHttpClientConfig;
-import org.asynchttpclient.Response;
-import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,19 +52,19 @@ public class ExecutionClient implements Runnable {
 	public int port = 80;
 
 	@Option(type = OptionType.GLOBAL, name = "-nombreLots", description = "Nombre de lots de messages (défaut : 100)")
-	public int n = 100;
+	public int n = 1000;
 
 	@Option(type = OptionType.GLOBAL, name = "-messagesLot", description = "Nombre de messages par lot (défaut : 1000)")
 	public int m = 1000;
 
-	@Option(type = OptionType.GLOBAL, name = "-synthese", description = "Tests de la synthese (défaut : true)")
-	public boolean synthese = true;
+	@Option(type = OptionType.GLOBAL, name = "-synthese", description = "Tests de la synthese (défaut : false)")
+	public boolean synthese = false;
 
 	@Option(type = OptionType.GLOBAL, name = "-synthesesLot", description = "Nombre de syntheses par lot (défaut : 10)")
 	public int syntheses = 10;
 
-	@Option(type = OptionType.GLOBAL, name = "-limites", description = "Tests de cas au limites (défaut : true)")
-	public boolean limite = true;
+	@Option(type = OptionType.GLOBAL, name = "-limites", description = "Tests de cas au limites (défaut : false)")
+	public boolean limite = false;
 
 	@Option(type = OptionType.GLOBAL, name = "-sensors", description = "Nombre de sensors (défaut : 10)")
 	public int sensors = 10;
@@ -90,31 +83,33 @@ public class ExecutionClient implements Runnable {
 
 	private ReentrantLock lock = new ReentrantLock();
 
-	private ExecutorService executor;
-
-	private AsyncHttpClient httpClient;
+	private ClientAsyncHTTP client;
 
 	@Override
 	public void run() {
+		ClientAsyncHTTP.MAX_VALUE = maxValue;
+		ClientAsyncHTTP.SENSOR_TYPES = sensors;
+		AbstractClient.THREADS = threads;
+
+		client = new ClientAsyncHTTP();
+		client.setHostPort(host, port);
 		messages = new TreeMap<>();
-		executor = Executors.newFixedThreadPool(threads);
-		AsyncHttpClientConfig cf = new DefaultAsyncHttpClientConfig.Builder().build();
-		httpClient = new DefaultAsyncHttpClient(cf);
+		testMoyenne();
 		if (limite) {
 			testLimites();
-			messages = new TreeMap<>();
 		}
+		messages = new TreeMap<>();
 		Stopwatch sw = Stopwatch.createStarted();
 		for (int i = 0; i < n; i++) {
 			long start = System.currentTimeMillis();
-			sendMessages();
+			client.sendMessages(m, true);
 			if (synthese) {
 				verifierSynthese(start);
 			}
 		}
 		LOGGER.info(sw.toString());
 		LOGGER.info((n * m) + " messages envoyés");
-		shutdown();
+		client.shutdown();
 		System.exit(0);
 	}
 
@@ -127,8 +122,8 @@ public class ExecutionClient implements Runnable {
 			long relativeStart = r.get().nextInt((int) (diff - duration));
 			long syntheseStart = start + relativeStart;
 			int durationSecondes = (int) (duration / 1000);
-			Map<Integer, JsonObject> remoteSynthese = getSynthese(syntheseStart, durationSecondes);
-			Map<Integer, Summary> local = getSummary(syntheseStart, durationSecondes);
+			Map<Integer, JsonObject> remoteSynthese = getSyntheseServeur(syntheseStart, durationSecondes);
+			Map<Integer, Summary> local = getSyntheseClient(syntheseStart, durationSecondes);
 			for (Entry<Integer, Summary> entry : local.entrySet()) {
 				assertEquals("min " + entry.getKey(), entry.getValue().getMin(),
 						getValeurSynthese(remoteSynthese, entry.getKey(), "minValue"));
@@ -141,33 +136,27 @@ public class ExecutionClient implements Runnable {
 	}
 
 	protected void testLimites() {
-		LOGGER.info("Envoi de deux messages avec des très grandes valeurs");
-		long start = System.currentTimeMillis();
-		sendMessage(null, null, SENSOR_LIMITE, Long.MAX_VALUE - 100);
-		sendMessage(null, null, SENSOR_LIMITE, Long.MAX_VALUE - 200);
-		Map<Integer, JsonObject> remoteSynthese = getSynthese(start, 10);
-		assertEquals("Mauvaise moyenne", Long.MAX_VALUE - 150,
-				getValeurSynthese(remoteSynthese, SENSOR_LIMITE, "mediumValue"));
+		testMoyenne();
 
-		start = System.currentTimeMillis();
+		long start = System.currentTimeMillis();
 		LOGGER.info("Envoi de deux messages avec des valeurs très éloignées");
-		sendMessage(null, null, SENSOR_LIMITE, Long.MIN_VALUE);
-		sendMessage(null, null, SENSOR_LIMITE, -1000L);
-		sendMessage(null, null, SENSOR_LIMITE, 1L);
-		sendMessage(null, null, SENSOR_LIMITE, 1000L);
-		sendMessage(null, null, SENSOR_LIMITE, 1000L);
-		sendMessage(null, null, SENSOR_LIMITE, -1000L);
-		sendMessage(null, null, SENSOR_LIMITE, Long.MAX_VALUE);
-		remoteSynthese = getSynthese(start, 10);
+		client.sendMessage(AbstractClient.getMessage(null, null, SENSOR_LIMITE, Long.MIN_VALUE));
+		client.sendMessage(AbstractClient.getMessage(null, null, SENSOR_LIMITE, -1000L));
+		client.sendMessage(AbstractClient.getMessage(null, null, SENSOR_LIMITE, 1L));
+		client.sendMessage(AbstractClient.getMessage(null, null, SENSOR_LIMITE, 1000L));
+		client.sendMessage(AbstractClient.getMessage(null, null, SENSOR_LIMITE, 1000L));
+		client.sendMessage(AbstractClient.getMessage(null, null, SENSOR_LIMITE, -1000L));
+		client.sendMessage(AbstractClient.getMessage(null, null, SENSOR_LIMITE, Long.MAX_VALUE));
+		Map<Integer, JsonObject> remoteSynthese = getSyntheseServeur(start, 10);
 		assertEquals("Mauvaise moyenne", 0L, getValeurSynthese(remoteSynthese, SENSOR_LIMITE, "mediumValue"));
 
 		LOGGER.info("Envoi du message regreergregregre");
-		sendMessage("regreergregregre", null, SENSOR_LIMITE, null);
+		client.sendMessage(AbstractClient.getMessage("regreergregregre", null, SENSOR_LIMITE, null));
 
 		LOGGER.info("Envoi de 2 messages identiques");
-		String sameId = getMessageId();
-		sendMessage(sameId, null, SENSOR_LIMITE, null);
-		if (!sendMessage(sameId, null, SENSOR_LIMITE, null)) {
+		String sameId = AbstractClient.getMessageId();
+		client.sendMessage(AbstractClient.getMessage(sameId, null, SENSOR_LIMITE, null));
+		if (!client.sendMessage(AbstractClient.getMessage(sameId, null, SENSOR_LIMITE, null))) {
 			LOGGER.info("Id dupliqué détecté");
 		} else {
 			LOGGER.error("Id dupliqué non détecté");
@@ -175,12 +164,14 @@ public class ExecutionClient implements Runnable {
 
 		List<String> ids = new ArrayList<>();
 		for (int i = 0; i < 5; i++) {
-			ids.add(getMessageId());
+			ids.add(AbstractClient.getMessageId());
 		}
+		ExecutorService executor = Executors.newFixedThreadPool(10);
 		List<Future<Boolean>> futures = new ArrayList<>();
 		for (int i = 0; i < 10; i++) {
 			for (String id : ids) {
-				futures.add(executor.submit(() -> sendMessage(id, null, SENSOR_LIMITE, null)));
+				futures.add(executor
+						.submit(() -> client.sendMessage(AbstractClient.getMessage(id, null, SENSOR_LIMITE, null))));
 			}
 		}
 		try {
@@ -198,6 +189,17 @@ public class ExecutionClient implements Runnable {
 		} catch (Exception e) {
 			LOGGER.error(":(", e);
 		}
+		executor.shutdownNow();
+	}
+
+	protected void testMoyenne() {
+		LOGGER.info("Envoi de deux messages avec des très grandes valeurs");
+		long start = System.currentTimeMillis();
+		client.sendMessage(AbstractClient.getMessage(null, null, SENSOR_LIMITE, Long.MAX_VALUE - 100));
+		client.sendMessage(AbstractClient.getMessage(null, null, SENSOR_LIMITE, Long.MAX_VALUE - 200));
+		Map<Integer, JsonObject> remoteSynthese = getSyntheseServeur(start, 10);
+		assertEquals("Mauvaise moyenne", Long.MAX_VALUE - 150,
+				getValeurSynthese(remoteSynthese, SENSOR_LIMITE, "mediumValue"));
 	}
 
 	protected Object getValeurSynthese(Map<Integer, JsonObject> remoteSynthese, Integer i, String key) {
@@ -223,54 +225,6 @@ public class ExecutionClient implements Runnable {
 		}
 	}
 
-	protected void sendMessages() {
-		LOGGER.info("Envoi de " + m + " messages.");
-		Future<?>[] futures = new Future<?>[m];
-		long start = System.nanoTime();
-		for (int i = 0; i < m; i++) {
-			futures[i] = executor.submit(() -> sendMessageRandomTime());
-		}
-		for (Future<?> future : futures) {
-			try {
-				future.get();
-			} catch (InterruptedException | ExecutionException e) {
-				LOGGER.error("?", e);
-			}
-		}
-		long end = System.nanoTime();
-		double diff = (end - start) / 1000000000.0;
-		double rate = m / diff;
-		LOGGER.info(rate + " messages/s");
-	}
-
-	protected void shutdown() {
-		LOGGER.info("Fermeture du pool d'exécution.");
-		executor.shutdownNow();
-		try {
-			httpClient.close();
-		} catch (IOException e) {
-			LOGGER.error("Erreur", e);
-		}
-	}
-
-	protected void sendMessageRandomTime() {
-		Long timestamp = System.currentTimeMillis() - 10000 + r.get().nextInt(20000);
-		sendMessage(null, timestamp, null, null);
-	}
-
-	protected boolean sendMessage(String idParam, Long timestampParam, Integer sensorTypeParam, Long valueParam) {
-		String id = idParam == null ? getMessageId() : idParam;
-		long timestamp = timestampParam == null ? getMessageTimestamp() : timestampParam;
-		int sensorType = sensorTypeParam == null ? getMessageSensorType() : sensorTypeParam;
-		long value = valueParam == null ? getMessageValue() : valueParam;
-		String json = getJson(id, timestamp, sensorType, value);
-		boolean ok = sendMessage(json);
-		if (ok) {
-			indexMessage(timestamp, sensorType, value);
-		}
-		return ok;
-	}
-
 	protected void indexMessage(long timestamp, int sensorType, long value) {
 		UUID timeUUID = new UUID(timestamp, currentId.getAndIncrement());
 		UUID valueUUID = new UUID(sensorType, value);
@@ -282,68 +236,8 @@ public class ExecutionClient implements Runnable {
 		}
 	}
 
-	protected String getJson(String id, long timestamp, int sensorType, long value) {
-		return "{ \"id\" : \"" + id + "\", \"timestamp\" : \"" + formatDateTime(timestamp) + "\", \"sensorType\" : "
-				+ sensorType + ", \"value\" : " + value + "}";
-	}
-
-	protected boolean sendMessage(String json) {
-		try {
-			LOGGER.debug("Sending " + json);
-			Response response = httpClient.preparePost("http://" + host + ":" + port + "/messages")
-					.addHeader("Content-Type", "application/json").setBody(json).execute().get();
-			LOGGER.debug("Response " + response.getStatusCode());
-			if (response.getStatusCode() != 200) {
-				throw new IllegalStateException("Erreur! " + response);
-			}
-			return true;
-		} catch (Exception e) {
-			LOGGER.error("Echec à l'envoi du message", e);
-			return false;
-		}
-	}
-
-	protected String getMessageId() {
-		return getUUID() + getUUID();
-	}
-
-	protected String getUUID() {
-		return UUID.randomUUID().toString().replaceAll("-", "");
-	}
-
-	protected int getMessageSensorType() {
-		return r.get().nextInt(sensors);
-	}
-
-	protected long getMessageTimestamp() {
-		return System.currentTimeMillis();
-	}
-
-	protected String formatDateTime(long instant) {
-		return ISODateTimeFormat.dateTime().print(instant);
-	}
-
-	protected Long getMessageValue() {
-		if (maxValue == -1) {
-			return r.get().nextLong();
-		} else {
-			return (long) r.get().nextInt(maxValue);
-		}
-	}
-
-	protected Map<Integer, JsonObject> getSynthese(long start, int duration) {
-		String response = "";
-		try {
-			String timestamp = formatDateTime(start);
-			LOGGER.debug("Sending getSynthese " + timestamp + " " + duration);
-			response = httpClient.prepareGet("http://" + host + ":" + port + "/messages/synthesis")
-					.addQueryParam("timestamp", timestamp).addQueryParam("duration", duration + "").execute().get()
-					.getResponseBody();
-			LOGGER.debug("Response " + response);
-		} catch (Exception e) {
-			LOGGER.error("Echec", e);
-			return null;
-		}
+	protected Map<Integer, JsonObject> getSyntheseServeur(long start, int duration) {
+		String response = client.getSynthese(start, duration);
 		JsonReader reader = Json.createReader(new ByteArrayInputStream(response.getBytes()));
 		List<JsonValue> syntheses = reader.readArray();
 		return syntheses.stream()
@@ -352,7 +246,7 @@ public class ExecutionClient implements Runnable {
 				}, TreeMap::new));
 	}
 
-	protected Map<Integer, Summary> getSummary(long timestamp, Integer duration) {
+	protected Map<Integer, Summary> getSyntheseClient(long timestamp, Integer duration) {
 		long lo = timestamp;
 		long hi = timestamp + duration * 1000;
 		UUID from = new UUID(lo, Long.MIN_VALUE);
@@ -360,12 +254,11 @@ public class ExecutionClient implements Runnable {
 
 		Stream<UUID> stream = messages.subMap(from, to).values().stream();
 
-		Map<Long, List<Long>> messagesPerSensor = stream
-				.collect(groupingBy(UUID::getMostSignificantBits, mapping(UUID::getLeastSignificantBits, toList())));
-		Stream<Entry<Long, List<Long>>> grouped = messagesPerSensor.entrySet().stream();
+		Map<Integer, Summary> synthese = stream
+				.collect(groupingBy(uuid -> (int) uuid.getMostSignificantBits(), mapping(UUID::getLeastSignificantBits,
+						Collector.of(Summary::new, Summary::accept, Summary::combine2))));
 
-		return grouped.collect(toMap(e -> e.getKey().intValue(), e -> e.getValue().stream()
-				.collect(() -> new Summary(e.getKey().intValue()), Summary::accept, Summary::combine)));
+		return synthese;
 	}
 
 }
