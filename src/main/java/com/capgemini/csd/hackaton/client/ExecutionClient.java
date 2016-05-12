@@ -89,7 +89,6 @@ public class ExecutionClient implements Runnable {
 		client = new ClientAsyncHTTP();
 		client.setHostPort(host, port);
 		messages = new TreeMap<>();
-		testMoyenne();
 		if (limite) {
 			testLimites();
 		}
@@ -129,8 +128,29 @@ public class ExecutionClient implements Runnable {
 	}
 
 	protected void testLimites() {
-		testMoyenne();
+		testMoyenne1();
+		testMoyenne2();
+		testPersistence();
+		testDuplique1();
+		testDuplique2();
+	}
 
+	protected void testPersistence() {
+		LOGGER.info("Envoi du message regreergregregre");
+		client.sendMessage(AbstractClient.getMessage("regreergregregre", null, SENSOR_LIMITE, null));
+	}
+
+	protected void testMoyenne1() {
+		LOGGER.info("Envoi de deux messages avec des très grandes valeurs");
+		long start = System.currentTimeMillis();
+		client.sendMessage(AbstractClient.getMessage(null, null, SENSOR_LIMITE, Long.MAX_VALUE - 100));
+		client.sendMessage(AbstractClient.getMessage(null, null, SENSOR_LIMITE, Long.MAX_VALUE - 200));
+		Map<Integer, JsonObject> remoteSynthese = getSyntheseServeur(start, 10);
+		assertEquals("Mauvaise moyenne", Long.MAX_VALUE - 150,
+				getValeurSynthese(remoteSynthese, SENSOR_LIMITE, "mediumValue"));
+	}
+
+	protected void testMoyenne2() {
 		long start = System.currentTimeMillis();
 		LOGGER.info("Envoi de deux messages avec des valeurs très éloignées");
 		client.sendMessage(AbstractClient.getMessage(null, null, SENSOR_LIMITE, Long.MIN_VALUE));
@@ -142,10 +162,9 @@ public class ExecutionClient implements Runnable {
 		client.sendMessage(AbstractClient.getMessage(null, null, SENSOR_LIMITE, Long.MAX_VALUE));
 		Map<Integer, JsonObject> remoteSynthese = getSyntheseServeur(start, 10);
 		assertEquals("Mauvaise moyenne", 0L, getValeurSynthese(remoteSynthese, SENSOR_LIMITE, "mediumValue"));
+	}
 
-		LOGGER.info("Envoi du message regreergregregre");
-		client.sendMessage(AbstractClient.getMessage("regreergregregre", null, SENSOR_LIMITE, null));
-
+	protected void testDuplique1() {
 		LOGGER.info("Envoi de 2 messages identiques");
 		String sameId = AbstractClient.getMessageId();
 		client.sendMessage(AbstractClient.getMessage(sameId, null, SENSOR_LIMITE, null));
@@ -154,7 +173,9 @@ public class ExecutionClient implements Runnable {
 		} else {
 			LOGGER.error("Id dupliqué non détecté");
 		}
+	}
 
+	protected void testDuplique2() {
 		List<String> ids = new ArrayList<>();
 		for (int i = 0; i < 5; i++) {
 			ids.add(AbstractClient.getMessageId());
@@ -183,16 +204,6 @@ public class ExecutionClient implements Runnable {
 			LOGGER.error(":(", e);
 		}
 		executor.shutdownNow();
-	}
-
-	protected void testMoyenne() {
-		LOGGER.info("Envoi de deux messages avec des très grandes valeurs");
-		long start = System.currentTimeMillis();
-		client.sendMessage(AbstractClient.getMessage(null, null, SENSOR_LIMITE, Long.MAX_VALUE - 100));
-		client.sendMessage(AbstractClient.getMessage(null, null, SENSOR_LIMITE, Long.MAX_VALUE - 200));
-		Map<Integer, JsonObject> remoteSynthese = getSyntheseServeur(start, 10);
-		assertEquals("Mauvaise moyenne", Long.MAX_VALUE - 150,
-				getValeurSynthese(remoteSynthese, SENSOR_LIMITE, "mediumValue"));
 	}
 
 	protected Object getValeurSynthese(Map<Integer, JsonObject> remoteSynthese, Integer i, String key) {
