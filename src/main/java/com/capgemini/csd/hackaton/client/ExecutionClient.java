@@ -106,9 +106,13 @@ public class ExecutionClient implements Runnable {
 	}
 
 	protected void verifierSynthese(long startParam) {
+		if (syntheses == 0) {
+			return;
+		}
 		// on agrandit la plage pour les messages avec un timestamp aléatoire
 		long start = startParam - 10000;
 		long diff = System.currentTimeMillis() - start + 20000;
+		long startSyntheses = System.nanoTime();
 		for (int i = 0; i < syntheses; i++) {
 			long duration = 1000 + r.get().nextInt((int) diff - 2500);
 			long relativeStart = r.get().nextInt((int) (diff - duration));
@@ -125,6 +129,10 @@ public class ExecutionClient implements Runnable {
 						getValeurSynthese(remoteSynthese, entry.getKey(), "mediumValue"));
 			}
 		}
+		long endSyntheses = System.nanoTime();
+		double diffSyntheses = (endSyntheses - startSyntheses) / 1000000000.0;
+		double rate = syntheses / diffSyntheses;
+		LOGGER.info(rate + " synthese/s");
 	}
 
 	protected void testLimites() {
