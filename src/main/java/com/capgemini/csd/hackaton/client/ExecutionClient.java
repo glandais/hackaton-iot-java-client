@@ -2,8 +2,6 @@ package com.capgemini.csd.hackaton.client;
 
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.mapping;
-import static java.util.stream.Collectors.toList;
-import static java.util.stream.Collectors.toMap;
 
 import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
@@ -52,15 +50,12 @@ public class ExecutionClient implements Runnable {
 	public int port = 80;
 
 	@Option(type = OptionType.GLOBAL, name = "-nombreLots", description = "Nombre de lots de messages (défaut : 100)")
-	public int n = 1000;
+	public int n = 100;
 
 	@Option(type = OptionType.GLOBAL, name = "-messagesLot", description = "Nombre de messages par lot (défaut : 1000)")
 	public int m = 1000;
 
-	@Option(type = OptionType.GLOBAL, name = "-synthese", description = "Tests de la synthese (défaut : false)")
-	public boolean synthese = false;
-
-	@Option(type = OptionType.GLOBAL, name = "-synthesesLot", description = "Nombre de syntheses par lot (défaut : 10)")
+	@Option(type = OptionType.GLOBAL, name = "-syntheses", description = "Nombre de syntheses par lot (défaut : 10)")
 	public int syntheses = 10;
 
 	@Option(type = OptionType.GLOBAL, name = "-limites", description = "Tests de cas au limites (défaut : false)")
@@ -103,9 +98,7 @@ public class ExecutionClient implements Runnable {
 		for (int i = 0; i < n; i++) {
 			long start = System.currentTimeMillis();
 			client.sendMessages(m, true);
-			if (synthese) {
-				verifierSynthese(start);
-			}
+			verifierSynthese(start);
 		}
 		LOGGER.info(sw.toString());
 		LOGGER.info((n * m) + " messages envoyés");
