@@ -3,10 +3,6 @@ package com.capgemini.csd.hackaton.client;
 import java.util.Date;
 import java.util.Random;
 import java.util.UUID;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 
 import org.joda.time.format.ISODateTimeFormat;
 import org.slf4j.Logger;
@@ -63,16 +59,12 @@ public abstract class AbstractClient implements Client {
 		}
 	}
 
-	private ExecutorService executor;
-
 	protected String host;
 
 	protected int port;
 
 	public AbstractClient() {
 		super();
-		LOGGER.info("Initialisation avec " + THREADS + " threads.");
-		executor = Executors.newFixedThreadPool(THREADS);
 	}
 
 	@Override
@@ -84,32 +76,6 @@ public abstract class AbstractClient implements Client {
 	@Override
 	public boolean sendMessage(boolean randomTime) {
 		return sendMessage(getMessage(randomTime));
-	}
-
-	@Override
-	public void sendMessages(int count, boolean randomTime) {
-		LOGGER.info("Envoi de " + count + " messages.");
-		Future<?>[] futures = new Future<?>[count];
-		long start = System.nanoTime();
-		for (int i = 0; i < count; i++) {
-			futures[i] = executor.submit(() -> sendMessage(randomTime));
-		}
-		for (Future<?> future : futures) {
-			try {
-				future.get();
-			} catch (InterruptedException | ExecutionException e) {
-				LOGGER.error("?", e);
-			}
-		}
-		long end = System.nanoTime();
-		double diff = (end - start) / 1000000000.0;
-		double rate = count / diff;
-		LOGGER.info(rate + " messages/s");
-	}
-
-	public void shutdown() {
-		LOGGER.info("Fermeture du pool d'exécution.");
-		executor.shutdownNow();
 	}
 
 }

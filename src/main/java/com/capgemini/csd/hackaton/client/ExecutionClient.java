@@ -6,6 +6,7 @@ import static java.util.stream.Collectors.mapping;
 import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -250,6 +251,9 @@ public class ExecutionClient implements Runnable {
 
 	protected Map<Integer, JsonObject> getSyntheseServeur(long start, int duration) {
 		String response = client.getSynthese(start, duration);
+		if (response.length() == 0) {
+			return Collections.emptyMap();
+		}
 		JsonReader reader = Json.createReader(new ByteArrayInputStream(response.getBytes()));
 		List<JsonValue> syntheses = reader.readArray();
 		return syntheses.stream()
