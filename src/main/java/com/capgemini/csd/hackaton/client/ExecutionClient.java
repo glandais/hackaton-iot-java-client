@@ -1,8 +1,5 @@
 package com.capgemini.csd.hackaton.client;
 
-import static java.util.stream.Collectors.groupingBy;
-import static java.util.stream.Collectors.mapping;
-
 import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -10,18 +7,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.NavigableMap;
 import java.util.Random;
 import java.util.TreeMap;
-import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.ReentrantLock;
-import java.util.stream.Collector;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import javax.json.Json;
 import javax.json.JsonObject;
@@ -73,12 +64,6 @@ public class ExecutionClient implements Runnable {
 
 	private ThreadLocal<Random> r = ThreadLocal.withInitial(() -> new Random());
 
-	private AtomicLong currentId = new AtomicLong();
-
-	private NavigableMap<UUID, UUID> messages;
-
-	private ReentrantLock lock = new ReentrantLock();
-
 	private ClientAsyncHTTP client;
 
 	@Override
@@ -89,11 +74,11 @@ public class ExecutionClient implements Runnable {
 
 		client = new ClientAsyncHTTP();
 		client.setHostPort(host, port);
-		messages = new TreeMap<>();
+		client.razMessages();
 		if (limite) {
 			testLimites();
 		}
-		messages = new TreeMap<>();
+		client.razMessages();
 		Stopwatch sw = Stopwatch.createStarted();
 		for (int i = 0; i < n; i++) {
 			long start = System.currentTimeMillis();
@@ -120,7 +105,7 @@ public class ExecutionClient implements Runnable {
 			long syntheseStart = start + relativeStart;
 			int durationSecondes = (int) (duration / 1000);
 			Map<Integer, JsonObject> remoteSynthese = getSyntheseServeur(syntheseStart, durationSecondes);
-			Map<Integer, Summary> local = getSyntheseClient(syntheseStart, durationSecondes);
+			Map<Integer, Summary> local = client.getSyntheseLocale(syntheseStart, durationSecondes);
 			for (Entry<Integer, Summary> entry : local.entrySet()) {
 				assertEquals("min " + entry.getKey(), entry.getValue().getMin(),
 						getValeurSynthese(remoteSynthese, entry.getKey(), "minValue"));
@@ -238,19 +223,8 @@ public class ExecutionClient implements Runnable {
 		}
 	}
 
-	protected void indexMessage(long timestamp, int sensorType, long value) {
-		UUID timeUUID = new UUID(timestamp, currentId.getAndIncrement());
-		UUID valueUUID = new UUID(sensorType, value);
-		lock.lock();
-		try {
-			messages.put(timeUUID, valueUUID);
-		} finally {
-			lock.unlock();
-		}
-	}
-
 	protected Map<Integer, JsonObject> getSyntheseServeur(long start, int duration) {
-		String response = client.getSynthese(start, duration);
+		String response = client.getSyntheseDistante(start, duration);
 		if (response.length() == 0) {
 			return Collections.emptyMap();
 		}
@@ -260,21 +234,6 @@ public class ExecutionClient implements Runnable {
 				.collect(Collectors.toMap(e -> ((JsonObject) e).getInt("sensorType"), e -> (JsonObject) e, (k, v) -> {
 					throw new RuntimeException(String.format("Duplicate key %s", k));
 				}, TreeMap::new));
-	}
-
-	protected Map<Integer, Summary> getSyntheseClient(long timestamp, Integer duration) {
-		long lo = timestamp;
-		long hi = timestamp + duration * 1000;
-		UUID from = new UUID(lo, Long.MIN_VALUE);
-		UUID to = new UUID(hi, Long.MAX_VALUE);
-
-		Stream<UUID> stream = messages.subMap(from, to).values().stream();
-
-		Map<Integer, Summary> synthese = stream
-				.collect(groupingBy(uuid -> (int) uuid.getMostSignificantBits(), mapping(UUID::getLeastSignificantBits,
-						Collector.of(Summary::new, Summary::accept, Summary::combine2))));
-
-		return synthese;
 	}
 
 }

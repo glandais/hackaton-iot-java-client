@@ -1,6 +1,7 @@
 package com.capgemini.csd.hackaton.client;
 
 import java.io.IOException;
+import java.util.TreeMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
@@ -30,7 +31,7 @@ public class ClientAsyncHTTP extends AbstractClient {
 		Future<Response>[] futures = new Future[count];
 		String[] messages = new String[count];
 		for (int i = 0; i < count; i++) {
-			messages[i] = getMessage(randomTime);
+			messages[i] = getMessage(randomTime, this);
 		}
 		long start = System.nanoTime();
 		for (int i = 0; i < count; i++) {
@@ -71,7 +72,7 @@ public class ClientAsyncHTTP extends AbstractClient {
 	}
 
 	@Override
-	public String getSynthese(long start, int duration) {
+	public String getSyntheseDistante(long start, int duration) {
 		try {
 			// LOGGER.info("Sending getSynthese");
 			String response = httpClient.prepareGet("http://" + host + ":" + port + "/messages/synthesis")
