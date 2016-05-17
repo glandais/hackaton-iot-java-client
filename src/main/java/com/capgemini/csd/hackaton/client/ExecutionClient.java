@@ -106,19 +106,25 @@ public class ExecutionClient implements Runnable {
 			int durationSecondes = (int) (duration / 1000);
 			Map<Integer, JsonObject> remoteSynthese = getSyntheseServeur(syntheseStart, durationSecondes);
 			Map<Integer, Summary> local = client.getSyntheseLocale(syntheseStart, durationSecondes);
-			for (Entry<Integer, Summary> entry : local.entrySet()) {
-				assertEquals("min " + entry.getKey(), entry.getValue().getMin(),
-						getValeurSynthese(remoteSynthese, entry.getKey(), "minValue"));
-				assertEquals("max " + entry.getKey(), entry.getValue().getMax(),
-						getValeurSynthese(remoteSynthese, entry.getKey(), "maxValue"));
-				assertEquals("avg " + entry.getKey(), entry.getValue().getAverage(),
-						getValeurSynthese(remoteSynthese, entry.getKey(), "mediumValue"));
-			}
+			testEq(remoteSynthese, local);
 		}
 		long endSyntheses = System.nanoTime();
 		double diffSyntheses = (endSyntheses - startSyntheses) / 1000000000.0;
 		double rate = syntheses / diffSyntheses;
 		LOGGER.info(rate + " synthese/s");
+	}
+
+	protected boolean testEq(Map<Integer, JsonObject> remoteSynthese, Map<Integer, Summary> local) {
+		boolean eq = true;
+		for (Entry<Integer, Summary> entry : local.entrySet()) {
+			eq = assertEquals("min " + entry.getKey(), entry.getValue().getMin(),
+					getValeurSynthese(remoteSynthese, entry.getKey(), "minValue")) && eq;
+			eq = assertEquals("max " + entry.getKey(), entry.getValue().getMax(),
+					getValeurSynthese(remoteSynthese, entry.getKey(), "maxValue")) && eq;
+			eq = assertEquals("avg " + entry.getKey(), entry.getValue().getAverage(),
+					getValeurSynthese(remoteSynthese, entry.getKey(), "mediumValue")) && eq;
+		}
+		return eq;
 	}
 
 	protected void testLimites() {
@@ -207,19 +213,22 @@ public class ExecutionClient implements Runnable {
 		return null;
 	}
 
-	protected void assertEquals(String message, Object expected, Object actual) {
+	protected boolean assertEquals(String message, Object expected, Object actual) {
 		if (expected instanceof Number && actual instanceof Number) {
 			BigDecimal bg1 = new BigDecimal(expected.toString()).stripTrailingZeros();
 			BigDecimal bg2 = new BigDecimal(actual.toString()).stripTrailingZeros();
-			assertEqualsDo(message, bg1, bg2);
+			return assertEqualsDo(message, bg1, bg2);
 		} else {
-			assertEqualsDo(message, expected, actual);
+			return assertEqualsDo(message, expected, actual);
 		}
 	}
 
-	protected void assertEqualsDo(String message, Object expected, Object actual) {
+	protected boolean assertEqualsDo(String message, Object expected, Object actual) {
 		if ((expected == null && actual != null) || (expected != null && !expected.equals(actual))) {
 			LOGGER.error(message + " (attendu : " + expected + ", obtenu : " + actual + ")");
+			return false;
+		} else {
+			return true;
 		}
 	}
 
