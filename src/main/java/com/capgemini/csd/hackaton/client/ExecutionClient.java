@@ -82,7 +82,7 @@ public class ExecutionClient implements Runnable {
 		Stopwatch sw = Stopwatch.createStarted();
 		for (int i = 0; i < n; i++) {
 			long start = System.currentTimeMillis();
-			client.sendMessages(m, true);
+			client.sendMessages(m, false);
 			verifierSynthese(start);
 		}
 		LOGGER.info(sw.toString());
@@ -143,8 +143,8 @@ public class ExecutionClient implements Runnable {
 	protected void testMoyenne1() {
 		LOGGER.info("Envoi de deux messages avec des très grandes valeurs");
 		long start = System.currentTimeMillis();
-		client.sendMessage(AbstractClient.getMessage(null, null, SENSOR_LIMITE, Long.MAX_VALUE - 100));
-		client.sendMessage(AbstractClient.getMessage(null, null, SENSOR_LIMITE, Long.MAX_VALUE - 200));
+		client.sendMessage(AbstractClient.getMessage(null, start, SENSOR_LIMITE, Long.MAX_VALUE - 100));
+		client.sendMessage(AbstractClient.getMessage(null, start + 10, SENSOR_LIMITE, Long.MAX_VALUE - 200));
 		Map<Integer, JsonObject> remoteSynthese = getSyntheseServeur(start, 10);
 		assertEquals("Mauvaise moyenne", Long.MAX_VALUE - 150,
 				getValeurSynthese(remoteSynthese, SENSOR_LIMITE, "mediumValue"));
@@ -153,13 +153,13 @@ public class ExecutionClient implements Runnable {
 	protected void testMoyenne2() {
 		long start = System.currentTimeMillis();
 		LOGGER.info("Envoi de deux messages avec des valeurs très éloignées");
-		client.sendMessage(AbstractClient.getMessage(null, null, SENSOR_LIMITE, Long.MIN_VALUE));
-		client.sendMessage(AbstractClient.getMessage(null, null, SENSOR_LIMITE, -1000L));
-		client.sendMessage(AbstractClient.getMessage(null, null, SENSOR_LIMITE, 1L));
-		client.sendMessage(AbstractClient.getMessage(null, null, SENSOR_LIMITE, 1000L));
-		client.sendMessage(AbstractClient.getMessage(null, null, SENSOR_LIMITE, 1000L));
-		client.sendMessage(AbstractClient.getMessage(null, null, SENSOR_LIMITE, -1000L));
-		client.sendMessage(AbstractClient.getMessage(null, null, SENSOR_LIMITE, Long.MAX_VALUE));
+		client.sendMessage(AbstractClient.getMessage(null, start, SENSOR_LIMITE, Long.MIN_VALUE));
+		client.sendMessage(AbstractClient.getMessage(null, start + 1, SENSOR_LIMITE, -1000L));
+		client.sendMessage(AbstractClient.getMessage(null, start + 2, SENSOR_LIMITE, 1L));
+		client.sendMessage(AbstractClient.getMessage(null, start + 3, SENSOR_LIMITE, 1000L));
+		client.sendMessage(AbstractClient.getMessage(null, start + 4, SENSOR_LIMITE, 1000L));
+		client.sendMessage(AbstractClient.getMessage(null, start + 5, SENSOR_LIMITE, -1000L));
+		client.sendMessage(AbstractClient.getMessage(null, start + 6, SENSOR_LIMITE, Long.MAX_VALUE));
 		Map<Integer, JsonObject> remoteSynthese = getSyntheseServeur(start, 10);
 		assertEquals("Mauvaise moyenne", 0L, getValeurSynthese(remoteSynthese, SENSOR_LIMITE, "mediumValue"));
 	}
