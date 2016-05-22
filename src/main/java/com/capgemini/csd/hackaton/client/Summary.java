@@ -45,7 +45,7 @@ public class Summary {
 	}
 
 	public BigDecimal getAverage() {
-		return total.divide(BigDecimal.valueOf(count), 2, RoundingMode.HALF_DOWN);
+		return total.divide(BigDecimal.valueOf(count), 2, RoundingMode.HALF_UP);
 	}
 
 	public void setSensorType(int sensorType) {
@@ -98,7 +98,7 @@ public class Summary {
 
 	@Override
 	public String toString() {
-		BigDecimal average = total.divide(BigDecimal.valueOf(count), 2, RoundingMode.HALF_DOWN);
+		BigDecimal average = total.divide(BigDecimal.valueOf(count), 2, RoundingMode.HALF_UP);
 		return "{\"sensorType\":" + sensorType + ",\"minValue\":" + min + ",\"maxValue\":" + max + ",\"mediumValue\":"
 				+ average.toString() + "}";
 	}

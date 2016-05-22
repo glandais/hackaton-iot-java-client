@@ -41,8 +41,8 @@ public class ExecutionClient implements Runnable {
 	@Option(type = OptionType.GLOBAL, name = "-port", description = "Port (défaut : 80)")
 	public int port = 80;
 
-	@Option(type = OptionType.GLOBAL, name = "-nombreLots", description = "Nombre de lots de messages (défaut : 100)")
-	public int n = 100;
+	@Option(type = OptionType.GLOBAL, name = "-nombreLots", description = "Nombre de lots de messages (défaut : 1000)")
+	public int n = 1000;
 
 	@Option(type = OptionType.GLOBAL, name = "-messagesLot", description = "Nombre de messages par lot (défaut : 1000)")
 	public int m = 1000;
