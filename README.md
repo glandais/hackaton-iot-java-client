@@ -20,14 +20,14 @@ NAME
 SYNOPSIS
         hackaton-client [-host <host>] [-limites] [-maxValue <maxValue>]
                 [-messagesLot <m>] [-nombreLots <n>] [-port <port>] [-sensors <sensors>]
-                [-synthese] [-synthesesLot <syntheses>] [-threads <threads>] client
+                [-syntheses <syntheses>] [-threads <threads>] client
 
 OPTIONS
         -host <host>
             Host (défaut : 192.168.1.1)
 
         -limites
-            Tests de cas au limites (défaut : true)
+            Tests de cas au limites (défaut : false)
 
         -maxValue <maxValue>
             value max (-1 pour toute la plage de long) (défaut : 10000)
@@ -36,7 +36,7 @@ OPTIONS
             Nombre de messages par lot (défaut : 1000)
 
         -nombreLots <n>
-            Nombre de lots de messages (défaut : 100)
+            Nombre de lots de messages (défaut : 1000)
 
         -port <port>
             Port (défaut : 80)
@@ -44,10 +44,7 @@ OPTIONS
         -sensors <sensors>
             Nombre de sensors (défaut : 10)
 
-        -synthese
-            Tests de la synthese (défaut : true)
-
-        -synthesesLot <syntheses>
+        -syntheses <syntheses>
             Nombre de syntheses par lot (défaut : 10)
 
         -threads <threads>
